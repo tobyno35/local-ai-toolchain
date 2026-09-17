@@ -2,7 +2,7 @@
 import sys, os, json, argparse, urllib.request, urllib.error
 from pathlib import Path
 WEAVE_DIR = Path.home() / ".weave"
-PATTERNS_DIR = WEAVE_DIR / "patterns"
+PATTERNS_DIR = Path(__file__).resolve().parent / "patterns"
 OLLAMA_URL = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
 DEFAULT_MODEL = os.environ.get("WEAVE_MODEL", "qwen2.5-coder:7b")
 def call_ollama(sp, ui, model):
@@ -18,9 +18,22 @@ def call_ollama(sp, ui, model):
                     if c.get("done"): print()
                 except: continue
     except urllib.error.URLError as e: print("[weave] Ollama unreachable",file=sys.stderr); sys.exit(1)
+def safe_pattern_path(name):
+    root = PATTERNS_DIR.resolve()
+    path = (root / (name + ".md")).resolve()
+
+    if not path.is_relative_to(root):
+        print("[weave] Permission Denied: Invalid pattern path", file=sys.stderr)
+        sys.exit(1)
+
+    return path
+
+
 def load_pattern(name):
-    p=PATTERNS_DIR/(name+".md")
-    if not p.exists(): print("[weave] Not found: "+name,file=sys.stderr); sys.exit(1)
+    p = safe_pattern_path(name)
+    if not p.exists():
+        print("[weave] Not found: " + name, file=sys.stderr)
+        sys.exit(1)
     return p.read_text().strip()
 def list_patterns():
     ps=sorted(PATTERNS_DIR.glob("*.md"))
@@ -30,8 +43,9 @@ def list_patterns():
         desc=next((l.lstrip("# ").strip() for l in lines[1:] if l.strip()),"")
         print("  "+p.stem.ljust(30)+desc[:50])
 def create_pattern(name):
-    p=PATTERNS_DIR/(name+".md"); p.write_text("# "+name+" ")
-    print("Created: "+str(p))
+    p = safe_pattern_path(name)
+    p.write_text("# " + name + " ")
+    print("Created: " + str(p))
 def main():
     ap=argparse.ArgumentParser(prog="weave")
     ap.add_argument("-p","--pattern"); ap.add_argument("-m","--model",default=DEFAULT_MODEL)
